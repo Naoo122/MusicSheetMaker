@@ -97,5 +97,5 @@ function drawTimeline() {
     // 再生カーソル
     const cursorX = audio.currentTime * scale;
     ctx.fillStyle = "#0f0";
-    ctx.fillRect(cursorX, 0, 2, 200);
+    ctx.fillRect(cursorX, 0, 2, 300);
 }
