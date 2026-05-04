@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>譜面エディタ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>譜面エディタ</h1>
+
+<div class="controls">
+    <input type="file" id="musicFile">
+    <button onclick="playMusic()">▶ 再生</button>
+    <button onclick="pauseMusic()">⏸ 停止</button>
+    <label>速度:
+        <input type="number" id="speed" value="1" step="0.1" min="0.5" max="2" onchange="changeSpeed()">
+    </label>
+    <label>BPM:
+        <input type="number" id="bpm" value="120" onchange="changeBPM()">
+    </label>
+</div>
+
+<div class="timeline-container">
+    <canvas id="timeline" width="1000" height="120"></canvas>
+</div>
+
+<h2>ノーツ配置</h2>
+
+<div id="grid"></div>
+
+<div class="note-settings">
+    <button onclick="setHand(0)">左手</button>
+    <button onclick="setHand(1)">右手</button>
+
+    <button onclick="setRotation(0)">↕ 0°</button>
+    <button onclick="setRotation(1)">↔ 90°</button>
+    <button onclick="setRotation(2)">↕ 180°</button>
+    <button onclick="setRotation(3)">↔ 270°</button>
+</div>
+
+<button class="save-btn" onclick="saveJson()">JSON 保存</button>
+
+<script src="editor.js"></script>
+</body>
+</html>
