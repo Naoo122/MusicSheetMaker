@@ -7,6 +7,19 @@ body {
     margin-bottom: 20px;
 }
 
+#timeline-container {
+    width: 100%;
+    overflow-x: scroll;
+    border: 1px solid #aaa;
+    background: #222;
+}
+
+.note-block {
+    position: absolute;
+    height: 30px;
+    border-radius: 4px;
+}
+
 #grid {
     display: grid;
     grid-template-columns: repeat(5, 60px);
@@ -21,15 +34,6 @@ body {
     background: #ddd;
     border: 1px solid #aaa;
     cursor: pointer;
-}
-
-#grid div.note {
-    background: #ff8080;
-}
-
-.timeline-container {
-    margin: 20px 0;
-    border: 1px solid #aaa;
 }
 
 .note-settings button {
