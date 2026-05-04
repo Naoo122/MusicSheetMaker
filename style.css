@@ -1,0 +1,43 @@
+body {
+    font-family: sans-serif;
+    margin: 20px;
+}
+
+.controls {
+    margin-bottom: 20px;
+}
+
+#grid {
+    display: grid;
+    grid-template-columns: repeat(5, 60px);
+    grid-template-rows: repeat(5, 60px);
+    gap: 5px;
+    margin-top: 20px;
+}
+
+#grid div {
+    width: 60px;
+    height: 60px;
+    background: #ddd;
+    border: 1px solid #aaa;
+    cursor: pointer;
+}
+
+#grid div.note {
+    background: #ff8080;
+}
+
+.timeline-container {
+    margin: 20px 0;
+    border: 1px solid #aaa;
+}
+
+.note-settings button {
+    margin-right: 10px;
+}
+
+.save-btn {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 18px;
+}
