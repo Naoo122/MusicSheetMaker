@@ -2,12 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>譜面エディタ</title>
+    <title>GarageBand風 譜面エディタ</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>譜面エディタ</h1>
+<h1>GarageBand風 譜面エディタ</h1>
 
 <div class="controls">
     <input type="file" id="musicFile">
@@ -21,11 +21,11 @@
     </label>
 </div>
 
-<div class="timeline-container">
-    <canvas id="timeline" width="1000" height="120"></canvas>
+<div id="timeline-container">
+    <canvas id="timeline" width="1600" height="200"></canvas>
 </div>
 
-<h2>ノーツ配置</h2>
+<h2>ノーツ設定</h2>
 
 <div id="grid"></div>
 
@@ -33,10 +33,10 @@
     <button onclick="setHand(0)">左手</button>
     <button onclick="setHand(1)">右手</button>
 
-    <button onclick="setRotation(0)">↕ 0°</button>
-    <button onclick="setRotation(1)">↔ 90°</button>
-    <button onclick="setRotation(2)">↕ 180°</button>
-    <button onclick="setRotation(3)">↔ 270°</button>
+    <button onclick="setRotation(0)">0°</button>
+    <button onclick="setRotation(1)">90°</button>
+    <button onclick="setRotation(2)">180°</button>
+    <button onclick="setRotation(3)">270°</button>
 </div>
 
 <button class="save-btn" onclick="saveJson()">JSON 保存</button>
