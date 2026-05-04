@@ -11,6 +11,8 @@ window.onload = () => {
     setupTimeline();
 };
 
+/* ---------------- グリッド ---------------- */
+
 function setupGrid() {
     const grid = document.getElementById("grid");
 
@@ -21,6 +23,8 @@ function setupGrid() {
     }
 }
 
+/* ---------------- 音楽 ---------------- */
+
 document.getElementById("musicFile").onchange = function(e) {
     const file = e.target.files[0];
     audio.src = URL.createObjectURL(file);
@@ -30,6 +34,8 @@ function playMusic() { audio.play(); }
 function pauseMusic() { audio.pause(); }
 function changeSpeed() { audio.playbackRate = parseFloat(speed.value); }
 function changeBPM() { bpm = parseInt(document.getElementById("bpm").value); }
+
+/* ---------------- ノーツ追加 ---------------- */
 
 function addNoteAtCurrentTime(gridIndex) {
     const time = audio.currentTime;
@@ -46,6 +52,8 @@ function addNoteAtCurrentTime(gridIndex) {
 
 function setHand(h) { selectedHand = h; }
 function setRotation(r) { selectedRotation = r; }
+
+/* ---------------- JSON 保存 ---------------- */
 
 function saveJson() {
     const data = {
@@ -77,6 +85,7 @@ function drawTimeline() {
 
     const scale = 100; // 1秒 = 100px
 
+    // ノーツ描画
     notes.forEach(n => {
         const x = n.time * scale;
         const y = 20 + (n.spawnPos * 3);
@@ -85,6 +94,7 @@ function drawTimeline() {
         ctx.fillRect(x, y, 20, 20);
     });
 
+    // 再生カーソル
     const cursorX = audio.currentTime * scale;
     ctx.fillStyle = "#0f0";
     ctx.fillRect(cursorX, 0, 2, 200);
