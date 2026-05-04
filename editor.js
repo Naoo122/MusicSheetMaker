@@ -4,6 +4,8 @@ let selectedHand = 0;
 let selectedRotation = 0;
 let bpm = 120;
 
+let timelineCanvas, ctx;
+
 window.onload = () => {
     setupGrid();
     setupTimeline();
@@ -14,17 +16,9 @@ function setupGrid() {
 
     for (let i = 0; i < 25; i++) {
         const cell = document.createElement("div");
-        cell.onclick = () => addNote(i, cell);
+        cell.onclick = () => addNoteAtCurrentTime(i);
         grid.appendChild(cell);
     }
-}
-
-function playMusic() {
-    audio.play();
-}
-
-function pauseMusic() {
-    audio.pause();
 }
 
 document.getElementById("musicFile").onchange = function(e) {
@@ -32,35 +26,26 @@ document.getElementById("musicFile").onchange = function(e) {
     audio.src = URL.createObjectURL(file);
 };
 
-function changeSpeed() {
-    audio.playbackRate = parseFloat(document.getElementById("speed").value);
-}
+function playMusic() { audio.play(); }
+function pauseMusic() { audio.pause(); }
+function changeSpeed() { audio.playbackRate = parseFloat(speed.value); }
+function changeBPM() { bpm = parseInt(document.getElementById("bpm").value); }
 
-function changeBPM() {
-    bpm = parseInt(document.getElementById("bpm").value);
-}
-
-function addNote(index, cell) {
+function addNoteAtCurrentTime(gridIndex) {
     const time = audio.currentTime;
 
     notes.push({
         time: time,
-        spawnPos: index,
+        spawnPos: gridIndex,
         hand: selectedHand,
         rotation: selectedRotation
     });
 
-    cell.classList.add("note");
     drawTimeline();
 }
 
-function setHand(h) {
-    selectedHand = h;
-}
-
-function setRotation(r) {
-    selectedRotation = r;
-}
+function setHand(h) { selectedHand = h; }
+function setRotation(r) { selectedRotation = r; }
 
 function saveJson() {
     const data = {
@@ -80,9 +65,6 @@ function saveJson() {
 
 /* ---------------- タイムライン描画 ---------------- */
 
-let timelineCanvas = null;
-let ctx = null;
-
 function setupTimeline() {
     timelineCanvas = document.getElementById("timeline");
     ctx = timelineCanvas.getContext("2d");
@@ -93,19 +75,17 @@ function setupTimeline() {
 function drawTimeline() {
     ctx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
 
-    ctx.fillStyle = "#333";
-    ctx.fillRect(0, 50, timelineCanvas.width, 2);
-
     const scale = 100; // 1秒 = 100px
 
     notes.forEach(n => {
         const x = n.time * scale;
+        const y = 20 + (n.spawnPos * 3);
 
         ctx.fillStyle = n.hand === 0 ? "#4af" : "#f44";
-        ctx.fillRect(x, 30, 10, 40);
+        ctx.fillRect(x, y, 20, 20);
     });
 
     const cursorX = audio.currentTime * scale;
     ctx.fillStyle = "#0f0";
-    ctx.fillRect(cursorX, 0, 2, 120);
+    ctx.fillRect(cursorX, 0, 2, 200);
 }
