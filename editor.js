@@ -3,6 +3,14 @@ let notes = [];
 let selectedHand = 0;
 let selectedRotation = 0;
 let bpm = 120;
+let timelineCanvas, ctx;
+let timelineScale = 100;   // 1秒 = 100px（ズーム用にも使える）
+let offsetX = 0;           // タイムラインの表示オフセット（自由移動の肝）
+
+let isPanning = false;
+let panStartX = 0;
+let panStartOffsetX = 0;
+
 
 let timelineCanvas, ctx;
 
@@ -77,17 +85,44 @@ function setupTimeline() {
     timelineCanvas = document.getElementById("timeline");
     ctx = timelineCanvas.getContext("2d");
 
+    // 既存の setInterval はそのまま
     setInterval(drawTimeline, 50);
+
+    // ★ ドラッグでタイムラインを動かす
+    timelineCanvas.addEventListener("mousedown", onTimelineMouseDown);
+    window.addEventListener("mousemove", onTimelineMouseMove);
+    window.addEventListener("mouseup", onTimelineMouseUp);
 }
+
+function onTimelineMouseDown(e) {
+    // 左クリックでパン開始
+    if (e.button === 0) {
+        isPanning = true;
+        panStartX = e.clientX;
+        panStartOffsetX = offsetX;
+    }
+}
+
+function onTimelineMouseMove(e) {
+    if (!isPanning) return;
+
+    const dx = e.clientX - panStartX;
+    offsetX = panStartOffsetX + dx;
+}
+
+function onTimelineMouseUp(e) {
+    isPanning = false;
+}
+
 
 function drawTimeline() {
     ctx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
 
-    const scale = 100; // 1秒 = 100px
+    // 小節線などを描くならここで offsetX を使う
 
     // ノーツ描画
     notes.forEach(n => {
-        const x = n.time * scale;
+        const x = n.time * timelineScale + offsetX;  // ★ ここに offsetX を足す
         const y = 20 + (n.spawnPos * 3);
 
         ctx.fillStyle = n.hand === 0 ? "#4af" : "#f44";
@@ -95,7 +130,7 @@ function drawTimeline() {
     });
 
     // 再生カーソル
-    const cursorX = audio.currentTime * scale;
+    const cursorX = audio.currentTime * timelineScale + offsetX; // ★ ここも
     ctx.fillStyle = "#0f0";
     ctx.fillRect(cursorX, 0, 2, 300);
 }
