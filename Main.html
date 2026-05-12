@@ -1,0 +1,1945 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VR Beatmap Editor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg-deep: #07090f;
+    --bg-panel: #0d1117;
+    --bg-surface: #141a24;
+    --bg-hover: #1c2535;
+    --border: #1e2d45;
+    --border-bright: #2a4060;
+    --text-primary: #c8d8f0;
+    --text-secondary: #6a8aad;
+    --text-dim: #3a5570;
+    --accent-cyan: #00d4ff;
+    --accent-cyan-dim: #007799;
+    --accent-red: #ff3860;
+    --accent-red-dim: #8b1a30;
+    --accent-blue: #3b82f6;
+    --accent-blue-dim: #1a3d7a;
+    --accent-yellow: #f59e0b;
+    --accent-green: #10b981;
+    --grid-size: 72px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    height: 44px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #topbar .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    color: var(--accent-cyan);
+    letter-spacing: 2px;
+    margin-right: 12px;
+    white-space: nowrap;
+  }
+
+  .tb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+  .tb-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .tb-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,212,255,0.05); }
+  .tb-btn svg { flex-shrink: 0; }
+
+  .tb-btn.danger:hover { border-color: var(--accent-red); color: var(--accent-red); background: rgba(255,56,96,0.05); }
+
+  .tb-info {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
+  .status-dot.active { background: var(--accent-green); box-shadow: 0 0 4px var(--accent-green); }
+
+  /* ── MAIN LAYOUT ── */
+  #main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    grid-template-rows: 1fr 130px 160px;
+    gap: 1px;
+    background: var(--border);
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .panel {
+    background: var(--bg-panel);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-header {
+    height: 28px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .panel-header .dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--accent-cyan);
+  }
+
+  /* ── GRID PANEL ── */
+  #grid-panel { grid-column: 1; grid-row: 1; }
+
+  #grid-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    padding: 16px;
+  }
+
+  #grid-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  #grid {
+    display: grid;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
+  .grid-cell {
+    width: var(--grid-size);
+    height: var(--grid-size);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: crosshair;
+    position: relative;
+    transition: border-color .1s, background .1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .grid-cell:hover { border-color: var(--accent-cyan-dim); background: var(--bg-hover); }
+
+  .cell-num {
+    position: absolute;
+    top: 3px; left: 5px;
+    font-size: 9px;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+
+  /* Note on cell */
+  .note-shape {
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    transition: transform .1s;
+  }
+
+  .note-shape.left-hand {
+    background: linear-gradient(135deg, #ff3860, #c02040);
+    box-shadow: 0 0 8px rgba(255,56,96,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+
+  .note-shape.right-hand {
+    background: linear-gradient(135deg, #3b82f6, #1a56c8);
+    box-shadow: 0 0 8px rgba(59,130,246,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+
+  .note-shape.selected {
+    box-shadow: 0 0 0 2px var(--accent-yellow), 0 0 12px rgba(245,158,11,0.4);
+  }
+
+  .note-arrow {
+    width: 0; height: 0;
+    position: absolute;
+  }
+
+  /* ── PROPS PANEL ── */
+  #props-panel { grid-column: 2; grid-row: 1; }
+
+  .props-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .props-section {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+  }
+
+  .props-section-title {
+    font-size: 9px;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .prop-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .prop-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    width: 60px;
+    flex-shrink: 0;
+  }
+
+  .prop-input {
+    flex: 1;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-primary);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 3px 6px;
+    width: 100%;
+    outline: none;
+  }
+
+  .prop-input:focus { border-color: var(--accent-cyan); }
+
+  select.prop-input option { background: var(--bg-panel); }
+
+  .grid-size-btns {
+    display: flex; gap: 4px;
+  }
+
+  .grid-size-btn {
+    flex: 1;
+    padding: 5px 0;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-secondary);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: center;
+    transition: all .1s;
+  }
+
+  .grid-size-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .grid-size-btn.active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,212,255,0.08); }
+
+  .note-empty {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 8px 0;
+    font-style: italic;
+  }
+
+  .hand-indicator {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .hand-indicator.left { background: rgba(255,56,96,0.15); color: var(--accent-red); border: 1px solid rgba(255,56,96,0.3); }
+  .hand-indicator.right { background: rgba(59,130,246,0.15); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); }
+
+  .rot-btns { display: flex; gap: 3px; }
+  .rot-btn {
+    width: 28px; height: 28px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .1s;
+  }
+  .rot-btn:hover { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+  .rot-btn.active { border-color: var(--accent-yellow); color: var(--accent-yellow); background: rgba(245,158,11,0.1); }
+
+  /* ── WAVEFORM ── */
+  #wave-panel { grid-column: 1; grid-row: 2; }
+
+  #waveform-canvas {
+    flex: 1;
+    cursor: pointer;
+    display: block;
+    width: 100%;
+  }
+
+  /* ── 3D PREVIEW ── */
+  #preview-panel { grid-column: 2; grid-row: 2 / 4; }
+
+  #preview-canvas { flex: 1; display: block; }
+
+  /* ── TIMELINE ── */
+  #timeline-panel { grid-column: 1; grid-row: 3; }
+
+  #timeline-canvas {
+    flex: 1;
+    cursor: crosshair;
+    display: block;
+    width: 100%;
+  }
+
+  /* ── PLAYBACK BAR ── */
+  #playbar {
+    height: 36px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .play-btn {
+    width: 26px; height: 26px;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid var(--accent-cyan-dim);
+    border-radius: 4px;
+    color: var(--accent-cyan);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    transition: all .1s;
+  }
+  .play-btn:hover { background: rgba(0,212,255,0.2); }
+  .play-btn.active { background: rgba(0,212,255,0.25); border-color: var(--accent-cyan); }
+
+  #time-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-cyan);
+    min-width: 70px;
+  }
+
+  #seek-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+  }
+
+  #seek-fill { height: 100%; background: var(--accent-cyan); border-radius: 2px; width: 0%; pointer-events: none; }
+
+  .vol-label { font-size: 10px; color: var(--text-secondary); }
+  #vol-input { width: 60px; accent-color: var(--accent-cyan); cursor: pointer; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-panel); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+  /* ── CONTEXT MENU ── */
+  #ctx-menu {
+    position: fixed;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 4px;
+    z-index: 9999;
+    display: none;
+    min-width: 130px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  }
+
+  .ctx-item {
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-primary);
+    display: flex; align-items: center; gap: 6px;
+    transition: background .1s;
+  }
+  .ctx-item:hover { background: var(--bg-hover); }
+  .ctx-item.danger { color: var(--accent-red); }
+  .ctx-item.danger:hover { background: rgba(255,56,96,0.1); }
+  .ctx-sep { height: 1px; background: var(--border); margin: 3px 0; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-surface);
+    border: 1px solid var(--accent-cyan);
+    color: var(--accent-cyan);
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    letter-spacing: 1px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s;
+    z-index: 9998;
+  }
+
+  #toast.show { opacity: 1; }
+
+  /* ── KEYBOARD HINTS ── */
+  .kbd-hints {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;
+  }
+  .kbd {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 9px;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .kbd span {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 1px 4px;
+    color: var(--text-secondary);
+  }
+
+  input[type=file] { display: none; }
+
+  .mode-indicator {
+    font-size: 9px;
+    font-family: 'Share Tech Mono', monospace;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 1px;
+  }
+  .mode-left { background: rgba(255,56,96,0.15); color: var(--accent-red); border: 1px solid rgba(255,56,96,0.3); }
+  .mode-right { background: rgba(59,130,246,0.15); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">▸ VR BEAT EDITOR</div>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="document.getElementById('mp3-input').click()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    MP3読込
+  </button>
+  <input type="file" id="mp3-input" accept=".mp3,.wav,.ogg" onchange="loadAudio(event)">
+  <button class="tb-btn" onclick="document.getElementById('json-input').click()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    JSON読込
+  </button>
+  <input type="file" id="json-input" accept=".json" onchange="loadJSON(event)">
+  <button class="tb-btn" onclick="exportJSON()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    エクスポート
+  </button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn danger" onclick="clearAllNotes()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+    全削除
+  </button>
+  <div class="tb-info">
+    <div class="status-dot" id="audio-dot"></div>
+    <span id="audio-name">No Audio</span>
+    <span>|</span>
+    <span id="note-count">0 notes</span>
+    <div class="tb-sep"></div>
+    <div class="kbd-hints">
+      <div class="kbd"><span>Space</span>再生</div>
+      <div class="kbd"><span>F</span>右手</div>
+      <div class="kbd"><span>J</span>左手</div>
+      <div class="kbd"><span>G</span>移動</div>
+      <div class="kbd"><span>Del</span>削除</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- GRID PANEL -->
+  <div class="panel" id="grid-panel">
+    <div class="panel-header">
+      <div class="dot"></div>
+      NOTE PLACEMENT
+      <span style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+        <span class="mode-indicator mode-left">LEFT CLICK = L</span>
+        <span class="mode-indicator mode-right">RIGHT CLICK = R</span>
+      </span>
+    </div>
+    <div id="grid-container" style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px;">
+      <canvas id="grid-canvas" style="display:block;cursor:crosshair;"></canvas>
+    </div>
+  </div>
+
+  <!-- PROPS PANEL -->
+  <div class="panel" id="props-panel">
+    <div class="panel-header"><div class="dot"></div>PROPERTIES</div>
+    <div class="props-body">
+      <!-- Chart settings -->
+      <div class="props-section">
+        <div class="props-section-title">CHART SETTINGS</div>
+        <div class="prop-row">
+          <div class="prop-label">BPM</div>
+          <input class="prop-input" type="number" id="bpm-input" value="120" min="60" max="300" step="1">
+        </div>
+        <div class="prop-row">
+          <div class="prop-label">難易度</div>
+          <select class="prop-input" id="diff-input">
+            <option>Easy</option>
+            <option selected>Normal</option>
+            <option>Hard</option>
+            <option>Expert</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <div class="prop-label">曲名</div>
+          <input class="prop-input" type="text" id="music-name" value="SongSample">
+        </div>
+      </div>
+
+      <!-- Grid size -->
+      <div class="props-section">
+        <div class="props-section-title">GRID SIZE</div>
+        <div class="grid-size-btns">
+          <div class="grid-size-btn" onclick="setGridSize(3)" id="gs-3">3×3</div>
+          <div class="grid-size-btn active" onclick="setGridSize(4)" id="gs-4">4×4</div>
+          <div class="grid-size-btn" onclick="setGridSize(5)" id="gs-5">5×5</div>
+        </div>
+      </div>
+
+      <!-- Selected note -->
+      <div class="props-section" id="note-props">
+        <div class="props-section-title">SELECTED NOTE</div>
+        <div id="note-empty" class="note-empty">ノーツ未選択</div>
+        <div id="note-edit" style="display:none;">
+          <div class="prop-row" style="margin-bottom:8px;">
+            <div id="hand-indicator" class="hand-indicator left">LEFT HAND</div>
+          </div>
+          <div class="prop-row">
+            <div class="prop-label">Time</div>
+            <input class="prop-input" type="number" id="note-time" step="0.01" onchange="updateSelectedNote()">
+          </div>
+          <div class="prop-row">
+            <div class="prop-label">SpawnPos</div>
+            <input class="prop-input" type="number" id="note-pos" min="1" onchange="updateSelectedNote()">
+          </div>
+          <div class="prop-row">
+            <div class="prop-label">Rotation</div>
+            <div class="rot-btns">
+              <div class="rot-btn" id="rb-0" onclick="setRotation(0)" title="上">↑</div>
+              <div class="rot-btn" id="rb-1" onclick="setRotation(1)" title="右">→</div>
+              <div class="rot-btn" id="rb-2" onclick="setRotation(2)" title="下">↓</div>
+              <div class="rot-btn" id="rb-3" onclick="setRotation(3)" title="左">←</div>
+            </div>
+          </div>
+          <button class="tb-btn danger" style="width:100%; margin-top:6px; justify-content:center;" onclick="deleteSelected()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            削除
+          </button>
+        </div>
+      </div>
+
+      <!-- Clipboard -->
+      <div class="props-section">
+        <div class="props-section-title">CLIPBOARD</div>
+        <div style="display:flex; gap:4px;">
+          <button class="tb-btn" style="flex:1; justify-content:center; font-size:11px;" onclick="copySelected()">コピー</button>
+          <button class="tb-btn" style="flex:1; justify-content:center; font-size:11px;" onclick="pasteNotes()">貼付け</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WAVEFORM PANEL -->
+  <div class="panel" id="wave-panel">
+    <div class="panel-header">
+      <div class="dot"></div>
+      WAVEFORM
+      <span style="margin-left:auto; font-size:9px; color:var(--text-dim);">クリックでシーク / ホイールでズーム</span>
+    </div>
+    <div id="playbar">
+      <button class="play-btn" id="play-btn" onclick="togglePlay()">▶</button>
+      <button class="play-btn" onclick="stopAudio()" title="停止">■</button>
+      <div id="time-display">0:00.00</div>
+      <div id="seek-bar" onclick="seekClick(event)">
+        <div id="seek-fill"></div>
+      </div>
+      <div class="vol-label">Vol</div>
+      <input type="range" id="vol-input" min="0" max="1" step="0.01" value="0.8" oninput="setVolume(this.value)">
+    </div>
+    <canvas id="waveform-canvas"></canvas>
+  </div>
+
+  <!-- 3D PREVIEW PANEL -->
+  <div class="panel" id="preview-panel">
+    <div class="panel-header"><div class="dot"></div>3D PREVIEW</div>
+    <canvas id="preview-canvas"></canvas>
+  </div>
+
+  <!-- TIMELINE PANEL -->
+  <div class="panel" id="timeline-panel">
+    <div class="panel-header">
+      <div class="dot"></div>
+      TIMELINE
+      <span style="margin-left:8px; font-size:9px; color:var(--text-dim);">縦: spawnPos / 横: 時間 / ホイールでズーム</span>
+      <span style="margin-left:auto; display:flex; align-items:center; gap:4px;">
+        <button class="play-btn" onclick="tlZoomOut()" title="縮小" style="width:20px;height:20px;font-size:13px;">−</button>
+        <span id="tl-zoom-label" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent-cyan);min-width:36px;text-align:center;">×1.0</span>
+        <button class="play-btn" onclick="tlZoomIn()" title="拡大" style="width:20px;height:20px;font-size:13px;">＋</button>
+        <button class="play-btn" onclick="tlZoomReset()" title="リセット" style="width:20px;height:20px;font-size:10px;margin-left:2px;">⟳</button>
+      </span>
+    </div>
+    <canvas id="timeline-canvas"></canvas>
+  </div>
+
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu">
+  <div class="ctx-item" onclick="ctxDuplicate()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    複製
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" onclick="ctxDelete()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    削除
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ================================================
+// STATE
+// ================================================
+let notes = [];
+let selectedNoteId = null;
+let clipboard = [];
+let gridSize = 4;
+let currentTime = 0;
+let duration = 0;
+let isPlaying = false;
+let audioCtx = null;
+let audioBuffer = null;
+let sourceNode = null;
+let startedAt = 0;
+let pausedAt = 0;
+let gainNode = null;
+let waveformData = null;
+let waveZoom = 1;
+let waveOffset = 0;
+let timelineZoom = 1;    // タイムライン横ズーム倍率
+let timelineOffset = 0;  // タイムライン表示開始時刻(秒)
+let noteIdCounter = 0;
+let ctxTargetId = null;
+let animFrameId = null;
+let rangeSelStart = null;
+let rangeSelected = [];
+let isDraggingNote = false;
+let dragNoteId = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+// THREE.js
+let scene, camera, renderer, previewNotes3d = [];
+
+// ================================================
+// INIT
+// ================================================
+window.addEventListener('load', () => {
+  resizeGridCanvas();
+  initGridEvents();
+  initThree();
+  resizeAll();
+  window.addEventListener('resize', () => { resizeGridCanvas(); resizeAll(); });
+  requestAnimationFrame(loop);
+});
+
+function resizeAll() {
+  resizeWaveform();
+  resizeTimeline();
+  resizePreview();
+}
+
+// ================================================
+// GRID (Canvas描画 — DOM操作なし)
+// ================================================
+const GRID_WINDOW_PAST   = 0.08;
+const GRID_WINDOW_FUTURE = 0.4;
+const ARROWS = ['↑','→','↓','←'];
+let gridDirty = true;   // 変更フラグ
+
+function setGridSize(n) {
+  gridSize = n;
+  [3,4,5].forEach(s => document.getElementById(`gs-${s}`).classList.toggle('active', s === n));
+  document.getElementById('note-pos').max = n * n;
+  resizeGridCanvas();
+  markDirty();
+  toast(`グリッド: ${n}×${n}`);
+}
+
+function resizeGridCanvas() {
+  const canvas = document.getElementById('grid-canvas');
+  const container = document.getElementById('grid-container');
+  const cw = container.clientWidth  - 16;
+  const ch = container.clientHeight - 16;
+  const cellPx = Math.floor(Math.min(cw / gridSize, ch / gridSize, 90));
+  const size = cellPx * gridSize;
+  canvas.width  = size;
+  canvas.height = size;
+  canvas.dataset.cellPx = cellPx;
+  markDirty();
+}
+
+function markDirty() { gridDirty = true; }
+
+function drawGrid() {
+  if (!gridDirty) return;
+  gridDirty = false;
+
+  const canvas = document.getElementById('grid-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const n = gridSize;
+  const cellPx = parseInt(canvas.dataset.cellPx) || 72;
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // 表示対象ノーツを収集（時間窓 + 選択中）
+  const cellMap = new Map();
+  notes.forEach(note => {
+    const dt = note.time - currentTime;
+    const inWindow = dt >= -GRID_WINDOW_PAST && dt <= GRID_WINDOW_FUTURE;
+    const isSelected = note.id === selectedNoteId;
+    if (!inWindow && !isSelected) return;
+    if (note.spawnPos < 1 || note.spawnPos > n * n) return;
+    const prev = cellMap.get(note.spawnPos);
+    if (!prev || Math.abs(dt) < Math.abs(prev.time - currentTime)) {
+      cellMap.set(note.spawnPos, note);
+    }
+  });
+
+  for (let pos = 1; pos <= n * n; pos++) {
+    const col = (pos - 1) % n;
+    const row = Math.floor((pos - 1) / n);
+    const x = col * cellPx;
+    const y = row * cellPx;
+    const pad = 2;
+
+    // セル背景
+    ctx.fillStyle = '#141a24';
+    ctx.strokeStyle = '#1e2d45';
+    ctx.lineWidth = 1;
+    roundRect(ctx, x + pad, y + pad, cellPx - pad*2, cellPx - pad*2, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // セル番号
+    ctx.fillStyle = '#3a5570';
+    ctx.font = `${Math.max(8, cellPx * 0.13)}px "Share Tech Mono"`;
+    ctx.textAlign = 'left';
+    ctx.fillText(pos, x + pad + 4, y + pad + 12);
+
+    const note = cellMap.get(pos);
+    if (!note) continue;
+
+    const dt = note.time - currentTime;
+    const isSelected = note.id === selectedNoteId;
+
+    // 不透明度
+    let alpha;
+    if (dt < 0) alpha = Math.max(0.15, 1 + dt / GRID_WINDOW_PAST);
+    else         alpha = Math.max(0.25, 1 - dt / GRID_WINDOW_FUTURE);
+    if (isSelected) alpha = Math.max(alpha, 0.95);
+
+    // スケール
+    const scaleRatio = isSelected ? 0.82 : Math.max(0.55, 0.82 * (1 - dt / GRID_WINDOW_FUTURE * 0.4));
+    const ns = Math.floor(cellPx * scaleRatio);
+    const nx = x + (cellPx - ns) / 2;
+    const ny = y + (cellPx - ns) / 2;
+
+    ctx.globalAlpha = alpha;
+
+    // ノーツ本体
+    const color = note.hand === 0 ? '#ff3860' : '#3b82f6';
+    const colorDark = note.hand === 0 ? '#8b1a30' : '#1a3d7a';
+    const grad = ctx.createLinearGradient(nx, ny, nx + ns, ny + ns);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, colorDark);
+    ctx.fillStyle = grad;
+    roundRect(ctx, nx, ny, ns, ns, 5);
+    ctx.fill();
+
+    // 選択枠
+    if (isSelected) {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      roundRect(ctx, nx - 2, ny - 2, ns + 4, ns + 4, 6);
+      ctx.stroke();
+    }
+
+    // 矢印
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `bold ${Math.floor(ns * 0.45)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ARROWS[note.rotation ?? 0], x + cellPx/2, y + cellPx/2);
+
+    // dtラベル
+    const dtMs = Math.round(dt * 1000);
+    ctx.font = `${Math.max(7, cellPx * 0.1)}px "Share Tech Mono"`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    if (Math.abs(dt) <= 0.01) {
+      ctx.fillStyle = 'rgba(255,255,100,0.95)';
+      ctx.fillText('NOW', x + cellPx - pad - 3, y + cellPx - pad - 2);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillText(`${dtMs > 0 ? '+' : ''}${dtMs}ms`, x + cellPx - pad - 3, y + cellPx - pad - 2);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
+// roundRect ヘルパー
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// グリッドCanvasのマウスイベント
+function initGridEvents() {
+  const canvas = document.getElementById('grid-canvas');
+  canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const pos = gridPosFromEvent(e);
+    if (!pos) return;
+    if (e.button === 2) { addNote(pos, 1); return; }
+    // 既存ノーツのヒット確認
+    const hit = hitTestGrid(e);
+    if (hit) {
+      if (e.button === 0) selectNote(hit.id);
+    } else {
+      if (e.button === 0) addNote(pos, 0);
+    }
+  });
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const hit = hitTestGrid(e);
+    if (hit) { selectNote(hit.id); showCtxMenu(e, hit.id); }
+    else {
+      const pos = gridPosFromEvent(e);
+      if (pos) addNote(pos, 1);
+    }
+  });
+}
+
+function gridPosFromEvent(e) {
+  const canvas = document.getElementById('grid-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const cellPx = parseInt(canvas.dataset.cellPx) || 72;
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const col = Math.floor(mx / cellPx);
+  const row = Math.floor(my / cellPx);
+  if (col < 0 || col >= gridSize || row < 0 || row >= gridSize) return null;
+  return row * gridSize + col + 1;
+}
+
+function hitTestGrid(e) {
+  const canvas = document.getElementById('grid-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const cellPx = parseInt(canvas.dataset.cellPx) || 72;
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  // 各ノーツのセル中央との距離でヒット判定
+  const cellMap = new Map();
+  notes.forEach(note => {
+    const dt = note.time - currentTime;
+    const inWindow = dt >= -GRID_WINDOW_PAST && dt <= GRID_WINDOW_FUTURE;
+    if (!inWindow && note.id !== selectedNoteId) return;
+    if (note.spawnPos < 1 || note.spawnPos > gridSize * gridSize) return;
+    const prev = cellMap.get(note.spawnPos);
+    if (!prev || Math.abs(dt) < Math.abs(prev.time - currentTime)) cellMap.set(note.spawnPos, note);
+  });
+  for (const [pos, note] of cellMap) {
+    const col = (pos - 1) % gridSize;
+    const row = Math.floor((pos - 1) / gridSize);
+    const cx = col * cellPx + cellPx / 2;
+    const cy = row * cellPx + cellPx / 2;
+    const half = cellPx * 0.42;
+    if (mx >= cx - half && mx <= cx + half && my >= cy - half && my <= cy + half) return note;
+  }
+  return null;
+}
+
+// (getSnapTime removed — grid uses currentTime directly)
+
+// ================================================
+// NOTE OPS
+// ================================================
+function addNote(pos, hand, e) {
+  const note = {
+    id: ++noteIdCounter,
+    time: parseFloat(currentTime.toFixed(3)),
+    spawnPos: pos,
+    hand,
+    rotation: 0
+  };
+  notes.push(note);
+  selectNote(note.id);
+  markDirty();
+  toast(`ノーツ追加: ${hand === 0 ? 'LEFT' : 'RIGHT'} pos=${pos}`);
+}
+
+function selectNote(id) {
+  selectedNoteId = id;
+  const note = notes.find(n => n.id === id);
+  if (note) {
+    document.getElementById('note-empty').style.display = 'none';
+    document.getElementById('note-edit').style.display = 'block';
+    document.getElementById('note-time').value = note.time;
+    document.getElementById('note-pos').value = note.spawnPos;
+    const hi = document.getElementById('hand-indicator');
+    hi.textContent = note.hand === 0 ? 'LEFT HAND' : 'RIGHT HAND';
+    hi.className = `hand-indicator ${note.hand === 0 ? 'left' : 'right'}`;
+    [0,1,2,3].forEach(r => {
+      document.getElementById(`rb-${r}`).classList.toggle('active', r === (note.rotation ?? 0));
+    });
+  }
+  markDirty();
+}
+
+function updateSelectedNote() {
+  const note = notes.find(n => n.id === selectedNoteId);
+  if (!note) return;
+  note.time = parseFloat(document.getElementById('note-time').value);
+  note.spawnPos = parseInt(document.getElementById('note-pos').value);
+  markDirty();
+}
+
+function setRotation(r) {
+  const note = notes.find(n => n.id === selectedNoteId);
+  if (!note) return;
+  note.rotation = r;
+  [0,1,2,3].forEach(i => document.getElementById(`rb-${i}`).classList.toggle('active', i === r));
+  markDirty();
+}
+
+function deleteSelected() {
+  if (!selectedNoteId) return;
+  notes = notes.filter(n => n.id !== selectedNoteId);
+  selectedNoteId = null;
+  document.getElementById('note-empty').style.display = 'block';
+  document.getElementById('note-edit').style.display = 'none';
+  markDirty();
+  toast('削除しました');
+}
+
+function clearAllNotes() {
+  if (!confirm('全ノーツを削除しますか？')) return;
+  notes = [];
+  selectedNoteId = null;
+  document.getElementById('note-empty').style.display = 'block';
+  document.getElementById('note-edit').style.display = 'none';
+  markDirty();
+  toast('全ノーツ削除');
+}
+
+function copySelected() {
+  if (!selectedNoteId) return;
+  const note = notes.find(n => n.id === selectedNoteId);
+  if (note) { clipboard = [Object.assign({}, note)]; toast('コピーしました'); }
+}
+
+function pasteNotes() {
+  if (!clipboard.length) return;
+  clipboard.forEach(n => {
+    const newNote = Object.assign({}, n, { id: ++noteIdCounter, time: parseFloat((n.time + 0.25).toFixed(3)) });
+    notes.push(newNote);
+    selectedNoteId = newNote.id;
+  });
+  markDirty();
+  toast('貼り付けました');
+}
+
+function updateNoteCount() {
+  document.getElementById('note-count').textContent = `${notes.length} notes`;
+}
+
+// ================================================
+// CONTEXT MENU
+// ================================================
+function showCtxMenu(e, id) {
+  ctxTargetId = id;
+  const m = document.getElementById('ctx-menu');
+  m.style.display = 'block';
+  m.style.left = e.clientX + 'px';
+  m.style.top = e.clientY + 'px';
+  e.preventDefault();
+}
+
+function hideCtxMenu() { document.getElementById('ctx-menu').style.display = 'none'; }
+
+function ctxDuplicate() {
+  const note = notes.find(n => n.id === ctxTargetId);
+  if (note) {
+    const newNote = Object.assign({}, note, { id: ++noteIdCounter, time: parseFloat((note.time + 0.25).toFixed(3)) });
+    notes.push(newNote);
+    selectNote(newNote.id);
+    markDirty();
+    markDirty();
+    markDirty();
+    toast('複製しました');
+  }
+  hideCtxMenu();
+}
+
+function ctxDelete() {
+  notes = notes.filter(n => n.id !== ctxTargetId);
+  if (selectedNoteId === ctxTargetId) selectedNoteId = null;
+  hideCtxMenu();
+  markDirty();
+  toast('削除しました');
+}
+
+document.addEventListener('click', hideCtxMenu);
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest('.note-shape')) hideCtxMenu();
+});
+
+// ================================================
+// G移動モード (Blender風)
+// ================================================
+let gMoveActive   = false;  // Gキー移動中フラグ
+let gMoveNoteId   = null;   // 移動対象ノーツID
+let gMoveOriginTime = 0;    // 移動前のtime
+let gMoveOriginPos  = 0;    // 移動前のspawnPos
+let gMoveStartX   = 0;     // マウス開始X (ピクセル)
+let gMoveAxis     = null;   // null=自由 / 'X'=時間軸のみ / 'Y'=spawnPos軸のみ
+
+function startGMove() {
+  if (!selectedNoteId) return;
+  const note = notes.find(n => n.id === selectedNoteId);
+  if (!note) return;
+  gMoveActive = true;
+  gMoveNoteId = selectedNoteId;
+  gMoveOriginTime = note.time;
+  gMoveOriginPos  = note.spawnPos;
+  gMoveAxis = null;
+
+  // タイムラインCanvas上のマウス座標を取得して起点にする
+  const canvas = document.getElementById('timeline-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const LABEL_W = 36;
+  const drawW = canvas.width - LABEL_W;
+  gMoveStartX = LABEL_W + tlTimeToX(note.time, drawW) + rect.left;
+
+  showGMoveOverlay(true);
+  toast('G移動: マウスで時間 / クリックで確定 / Escでキャンセル');
+}
+
+function cancelGMove() {
+  if (!gMoveActive) return;
+  const note = notes.find(n => n.id === gMoveNoteId);
+  if (note) { note.time = gMoveOriginTime; note.spawnPos = gMoveOriginPos; }
+  gMoveActive = false;
+  gMoveNoteId = null;
+  showGMoveOverlay(false);
+  markDirty();
+  toast('移動キャンセル');
+}
+
+function commitGMove() {
+  gMoveActive = false;
+  gMoveNoteId = null;
+  showGMoveOverlay(false);
+  markDirty();
+  toast('移動確定');
+}
+
+function showGMoveOverlay(on) {
+  let ov = document.getElementById('g-move-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'g-move-overlay';
+    ov.style.cssText = 'position:fixed;top:44px;left:0;right:0;bottom:0;z-index:8000;cursor:crosshair;';
+    ov.addEventListener('click',      commitGMove);
+    ov.addEventListener('mousemove',  onGMoveMouseMove);
+    ov.addEventListener('contextmenu', (e)=>{ e.preventDefault(); cancelGMove(); });
+    document.body.appendChild(ov);
+  }
+  ov.style.display = on ? 'block' : 'none';
+}
+
+function onGMoveMouseMove(e) {
+  if (!gMoveActive) return;
+  const note = notes.find(n => n.id === gMoveNoteId);
+  if (!note) return;
+
+  const canvas = document.getElementById('timeline-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const LABEL_W = 36;
+  const drawW = canvas.width - LABEL_W;
+  const totalDur = duration || 60;
+  const maxPos = gridSize * gridSize;
+  const H = canvas.height;
+
+  // X→時間差分、Y→spawnPos差分
+  const mx = e.clientX - rect.left - LABEL_W;
+  const my = e.clientY - rect.top;
+  const newTime = Math.max(0, Math.min(totalDur, tlXToTime(mx, drawW)));
+  const newPos  = Math.max(1, Math.min(maxPos, Math.round((1 - my / H) * maxPos) + 1));
+
+  // 軸制限
+  if (gMoveAxis === 'X') {
+    note.time = parseFloat(newTime.toFixed(3));
+  } else if (gMoveAxis === 'Y') {
+    note.spawnPos = newPos;
+  } else {
+    note.time     = parseFloat(newTime.toFixed(3));
+    note.spawnPos = newPos;
+  }
+
+  // プロパティパネル更新
+  document.getElementById('note-time').value = note.time;
+  document.getElementById('note-pos').value  = note.spawnPos;
+  markDirty();
+}
+
+// ================================================
+// KEYBOARD
+// ================================================
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+  // G移動モード中
+  if (gMoveActive) {
+    if (e.code === 'Escape')  { e.preventDefault(); cancelGMove(); return; }
+    if (e.code === 'Enter')   { e.preventDefault(); commitGMove(); return; }
+    if (e.code === 'KeyX')    { gMoveAxis = gMoveAxis === 'X' ? null : 'X'; toast('X軸(時間)のみ'); return; }
+    if (e.code === 'KeyY')    { gMoveAxis = gMoveAxis === 'Y' ? null : 'Y'; toast('Y軸(spawnPos)のみ'); return; }
+    return; // G移動中は他キー無効
+  }
+
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'Delete' || e.code === 'Backspace') deleteSelected();
+  if (e.code === 'KeyG' && selectedNoteId) { e.preventDefault(); startGMove(); }
+
+  if (isPlaying) {
+    if (e.code === 'KeyF') addNoteAtCurrentTime(1);
+    if (e.code === 'KeyJ') addNoteAtCurrentTime(0);
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    if (e.code === 'KeyC') { e.preventDefault(); copySelected(); }
+    if (e.code === 'KeyV') { e.preventDefault(); pasteNotes(); }
+  }
+});
+
+function addNoteAtCurrentTime(hand) {
+  const center = Math.floor((gridSize * gridSize) / 2) + 1;
+  const note = {
+    id: ++noteIdCounter,
+    time: parseFloat(currentTime.toFixed(3)),
+    spawnPos: center,
+    hand,
+    rotation: 0
+  };
+  notes.push(note);
+  markDirty();
+}
+
+// ================================================
+// AUDIO
+// ================================================
+function loadAudio(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = await audioCtx.decodeAudioData(e.target.result);
+    audioBuffer = buf;
+    duration = buf.duration;
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.8;
+    gainNode.connect(audioCtx.destination);
+    document.getElementById('audio-name').textContent = file.name;
+    document.getElementById('audio-dot').classList.add('active');
+    extractWaveform(buf);
+    pausedAt = 0;
+    toast(`音声読込: ${file.name}`);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function extractWaveform(buf) {
+  const ch = buf.getChannelData(0);
+  const samples = 2000;
+  const step = Math.floor(ch.length / samples);
+  waveformData = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) {
+    let max = 0;
+    for (let j = 0; j < step; j++) {
+      const v = Math.abs(ch[i * step + j] || 0);
+      if (v > max) max = v;
+    }
+    waveformData[i] = max;
+  }
+  resizeWaveform();
+}
+
+function togglePlay() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = parseFloat(document.getElementById('vol-input').value);
+    gainNode.connect(audioCtx.destination);
+  }
+
+  if (isPlaying) {
+    pausedAt = audioCtx.currentTime - startedAt;
+    if (sourceNode) { try { sourceNode.stop(); } catch(e) {} }
+    isPlaying = false;
+    document.getElementById('play-btn').textContent = '▶';
+    document.getElementById('play-btn').classList.remove('active');
+  } else {
+    if (audioBuffer) {
+      sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      sourceNode.connect(gainNode);
+      startedAt = audioCtx.currentTime - pausedAt;
+      sourceNode.start(0, pausedAt);
+      sourceNode.onended = () => {
+        if (isPlaying) { isPlaying = false; pausedAt = 0; document.getElementById('play-btn').textContent = '▶'; document.getElementById('play-btn').classList.remove('active'); }
+      };
+    } else {
+      startedAt = audioCtx.currentTime - pausedAt;
+    }
+    isPlaying = true;
+    document.getElementById('play-btn').textContent = '❚❚';
+    document.getElementById('play-btn').classList.add('active');
+  }
+}
+
+function stopAudio() {
+  if (isPlaying) togglePlay();
+  pausedAt = 0;
+  currentTime = 0;
+  document.getElementById('play-btn').textContent = '▶';
+  document.getElementById('play-btn').classList.remove('active');
+}
+
+function setVolume(v) {
+  if (gainNode) gainNode.gain.value = parseFloat(v);
+}
+
+function seekClick(e) {
+  const bar = document.getElementById('seek-bar');
+  const rect = bar.getBoundingClientRect();
+  const ratio = (e.clientX - rect.left) / rect.width;
+  const t = ratio * (duration || 60);
+  pausedAt = t;
+  currentTime = t;
+  if (isPlaying) {
+    if (sourceNode) { try { sourceNode.stop(); } catch(e) {} }
+    isPlaying = false;
+    togglePlay();
+  }
+}
+
+// ================================================
+// WAVEFORM
+// ================================================
+function resizeWaveform() {
+  const canvas = document.getElementById('waveform-canvas');
+  const panel = document.getElementById('wave-panel');
+  const ph = panel.clientHeight - 64;
+  const pw = panel.clientWidth;
+  if (pw < 1 || ph < 1) return;
+  canvas.width = pw;
+  canvas.height = Math.max(ph, 30);
+  drawWaveform();
+}
+
+function drawWaveform() {
+  const canvas = document.getElementById('waveform-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  const totalDur = duration || 60;
+
+  // Grid lines
+  ctx.strokeStyle = '#1e2d45';
+  ctx.lineWidth = 1;
+  const bpm = parseInt(document.getElementById('bpm-input').value) || 120;
+  const beatInterval = 60 / bpm;
+  const visStart = waveOffset;
+  const visEnd = visStart + totalDur / waveZoom;
+  for (let t = Math.floor(visStart / beatInterval) * beatInterval; t < visEnd; t += beatInterval) {
+    const x = timeToX(t, W, totalDur);
+    if (x < 0 || x > W) continue;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+
+  // Waveform
+  if (waveformData) {
+    const samples = waveformData.length;
+    ctx.beginPath();
+    ctx.strokeStyle = '#00d4ff';
+    ctx.lineWidth = 1;
+    const mid = H / 2;
+    for (let i = 0; i < W; i++) {
+      const t = xToTime(i, W, totalDur);
+      const si = Math.floor((t / totalDur) * samples);
+      const v = waveformData[Math.min(si, samples - 1)] || 0;
+      const y = v * mid * 0.85;
+      if (i === 0) ctx.moveTo(i, mid - y);
+      else ctx.lineTo(i, mid - y);
+    }
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+    for (let i = 0; i < W; i++) {
+      const t = xToTime(i, W, totalDur);
+      const si = Math.floor((t / totalDur) * samples);
+      const v = waveformData[Math.min(si, samples - 1)] || 0;
+      const y = v * mid * 0.85;
+      if (i === 0) ctx.moveTo(i, mid + y);
+      else ctx.lineTo(i, mid + y);
+    }
+    ctx.stroke();
+  }
+
+  // Note markers
+  notes.forEach(note => {
+    const x = timeToX(note.time, W, totalDur);
+    if (x < 0 || x > W) return;
+    ctx.fillStyle = note.hand === 0 ? 'rgba(255,56,96,0.7)' : 'rgba(59,130,246,0.7)';
+    ctx.fillRect(x - 1, 0, 2, H);
+  });
+
+  // Playhead
+  const px = timeToX(currentTime, W, totalDur);
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(px - 1, 0, 2, H);
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.moveTo(px - 5, 0);
+  ctx.lineTo(px + 5, 0);
+  ctx.lineTo(px, 8);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function timeToX(t, W, totalDur) {
+  const visStart = waveOffset;
+  const visDur = totalDur / waveZoom;
+  return ((t - visStart) / visDur) * W;
+}
+
+function xToTime(x, W, totalDur) {
+  const visDur = totalDur / waveZoom;
+  return waveOffset + (x / W) * visDur;
+}
+
+document.getElementById('waveform-canvas').addEventListener('click', (e) => {
+  const canvas = document.getElementById('waveform-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const t = xToTime(x, canvas.width, duration || 60);
+  pausedAt = Math.max(0, Math.min(t, duration || 60));
+  currentTime = pausedAt;
+  if (isPlaying) { if (sourceNode) { try { sourceNode.stop(); } catch(e2) {} } isPlaying = false; togglePlay(); }
+});
+
+document.getElementById('waveform-canvas').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.2 : 0.2;
+  waveZoom = Math.max(1, Math.min(20, waveZoom + delta));
+});
+
+// ================================================
+// TIMELINE
+// ================================================
+function tlZoomIn()    { timelineZoom = Math.min(40, timelineZoom * 1.4); updateTlZoomLabel(); }
+function tlZoomOut()   { timelineZoom = Math.max(1,  timelineZoom / 1.4); clampTlOffset(); updateTlZoomLabel(); }
+function tlZoomReset() { timelineZoom = 1; timelineOffset = 0; updateTlZoomLabel(); }
+function updateTlZoomLabel() {
+  document.getElementById('tl-zoom-label').textContent = `×${timelineZoom.toFixed(1)}`;
+}
+
+function clampTlOffset() {
+  const totalDur = duration || 60;
+  const visDur = totalDur / timelineZoom;
+  timelineOffset = Math.max(0, Math.min(timelineOffset, totalDur - visDur));
+}
+
+// タイムラインの時間→X座標変換（ズーム・オフセット考慮）
+function tlTimeToX(t, drawW) {
+  const totalDur = duration || 60;
+  const visDur = totalDur / timelineZoom;
+  return ((t - timelineOffset) / visDur) * drawW;
+}
+
+// タイムラインのX座標→時間変換
+function tlXToTime(x, drawW) {
+  const totalDur = duration || 60;
+  const visDur = totalDur / timelineZoom;
+  return timelineOffset + (x / drawW) * visDur;
+}
+
+function resizeTimeline() {
+  const canvas = document.getElementById('timeline-canvas');
+  const panel = document.getElementById('timeline-panel');
+  const ph = panel.clientHeight - 36;   // header=36px
+  const pw = panel.clientWidth;
+  if (pw < 1 || ph < 1) return;
+  canvas.width = pw;
+  canvas.height = Math.max(ph, 30);
+  markDirty();
+}
+
+function refreshTimeline() {
+  const canvas = document.getElementById('timeline-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const maxPos = gridSize * gridSize;
+  const totalDur = duration || 60;
+  const LABEL_W = 36;
+  const drawW = W - LABEL_W;
+  const rowH = H / maxPos;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  // Y axis bg
+  ctx.fillStyle = '#0a0e14';
+  ctx.fillRect(0, 0, LABEL_W, H);
+
+  // Visible time range
+  const visDur = totalDur / timelineZoom;
+  const visStart = timelineOffset;
+  const visEnd = visStart + visDur;
+
+  // Zebra rows
+  for (let p = 1; p <= maxPos; p++) {
+    const y = tlPosToY(p, H, maxPos);
+    if (p % 2 === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.018)';
+      ctx.fillRect(LABEL_W, y, drawW, rowH);
+    }
+    // Row label
+    ctx.fillStyle = '#3a5570';
+    ctx.font = `${Math.max(7, Math.min(10, rowH * 0.55))}px "Share Tech Mono"`;
+    ctx.textAlign = 'right';
+    ctx.fillText(p, LABEL_W - 4, y + rowH * 0.65);
+    // Row border
+    ctx.strokeStyle = '#1e2d45';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(LABEL_W, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.textAlign = 'left';
+
+  // Beat / bar markers
+  const bpm = parseInt(document.getElementById('bpm-input').value) || 120;
+  const beatSec = 60 / bpm;
+  // 適切な間隔を選ぶ（画面上最低12px間隔）
+  const minPxInterval = 12;
+  let beatDiv = 1;
+  while ((beatSec / beatDiv) / visDur * drawW < minPxInterval) beatDiv *= 2;
+  const tickSec = beatSec / beatDiv;
+  const firstTick = Math.floor(visStart / tickSec) * tickSec;
+
+  for (let t = firstTick; t <= visEnd + tickSec; t += tickSec) {
+    const x = LABEL_W + tlTimeToX(t, drawW);
+    if (x < LABEL_W || x > W) continue;
+    const isBeat = Math.abs(t % beatSec) < tickSec * 0.01 || Math.abs(t % beatSec - beatSec) < tickSec * 0.01;
+    const isBar  = Math.abs(t % (beatSec * 4)) < tickSec * 0.01 || Math.abs(t % (beatSec * 4) - beatSec * 4) < tickSec * 0.01;
+    ctx.strokeStyle = isBar ? '#2a4060' : isBeat ? '#1e2d45' : '#161f2e';
+    ctx.lineWidth = isBar ? 1 : 0.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+
+  // Time axis labels (底部)
+  ctx.fillStyle = '#3a5570';
+  ctx.font = '8px "Share Tech Mono"';
+  const labelStep = Math.max(0.25, (visDur / drawW) * 60);  // 最低60px間隔
+  const firstLabel = Math.ceil(visStart / labelStep) * labelStep;
+  for (let t = firstLabel; t <= visEnd; t += labelStep) {
+    const x = LABEL_W + tlTimeToX(t, drawW);
+    if (x < LABEL_W + 2 || x > W - 20) continue;
+    ctx.fillText(t.toFixed(2) + 's', x + 2, H - 2);
+  }
+
+  // Notes
+  const noteW = Math.max(6, Math.min(18, rowH * 0.65));  // ズームに応じた幅
+  notes.forEach(note => {
+    if (note.spawnPos < 1 || note.spawnPos > maxPos) return;
+    const x = LABEL_W + tlTimeToX(note.time, drawW);
+    if (x < LABEL_W - noteW || x > W + noteW) return;   // 画面外スキップ
+    const y = tlPosToY(note.spawnPos, H, maxPos);
+    const isSelected = note.id === selectedNoteId;
+    const color = note.hand === 0 ? '#ff3860' : '#3b82f6';
+
+    ctx.globalAlpha = isSelected ? 1 : 0.8;
+    ctx.fillStyle = color;
+    ctx.fillRect(x - noteW / 2, y + rowH * 0.12, noteW, rowH * 0.76);
+
+    // 矢印アイコン
+    const arrows = ['↑','→','↓','←'];
+    if (noteW >= 10) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = `${Math.min(noteW * 0.8, rowH * 0.6)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(arrows[note.rotation ?? 0], x, y + rowH * 0.7);
+      ctx.textAlign = 'left';
+    }
+
+    if (isSelected) {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x - noteW / 2 - 1, y + rowH * 0.12 - 1, noteW + 2, rowH * 0.76 + 2);
+    }
+    ctx.globalAlpha = 1;
+  });
+
+  // Playhead
+  const phX = LABEL_W + tlTimeToX(currentTime, drawW);
+  if (phX >= LABEL_W && phX <= W) {
+    ctx.fillStyle = '#f59e0b';
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(phX - 1, 0, 2, H);
+    ctx.fillStyle = '#f59e0b';
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.moveTo(phX - 5, 0); ctx.lineTo(phX + 5, 0); ctx.lineTo(phX, 7); ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function tlPosToY(pos, H, maxPos) {
+  return H - (pos / maxPos) * H;
+}
+
+// Timeline click & wheel
+document.getElementById('timeline-canvas').addEventListener('click', (e) => {
+  const canvas = document.getElementById('timeline-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const W = canvas.width, H = canvas.height;
+  const LABEL_W = 36;
+  if (x < LABEL_W) return;
+  const drawW = W - LABEL_W;
+  const maxPos = gridSize * gridSize;
+  const t = tlXToTime(x - LABEL_W, drawW);
+  const rowH = H / maxPos;
+  const noteW = Math.max(6, Math.min(18, rowH * 0.65));
+
+  // ノーツのヒット判定
+  let hit = null;
+  for (const note of notes) {
+    const nx = LABEL_W + tlTimeToX(note.time, drawW);
+    const ny = tlPosToY(note.spawnPos, H, maxPos);
+    if (Math.abs(x - nx) < noteW * 0.7 && y >= ny && y <= ny + rowH) {
+      hit = note; break;
+    }
+  }
+
+  if (hit) {
+    selectNote(hit.id);
+  } else {
+    currentTime = Math.max(0, Math.min(t, duration || 60));
+    pausedAt = currentTime;
+    // 再生中ならシーク
+    if (isPlaying) {
+      if (sourceNode) { try { sourceNode.stop(); } catch(e2) {} }
+      isPlaying = false;
+      togglePlay();
+    }
+  }
+});
+
+document.getElementById('timeline-canvas').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const canvas = document.getElementById('timeline-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left - 36;  // LABEL_W=36
+  const drawW = canvas.width - 36;
+  const totalDur = duration || 60;
+
+  // マウス位置の時刻を固定してズーム
+  const tAtMouse = tlXToTime(mouseX, drawW);
+  const oldZoom = timelineZoom;
+  const factor = e.deltaY < 0 ? 1.25 : 0.8;
+  timelineZoom = Math.max(1, Math.min(40, timelineZoom * factor));
+
+  // マウス位置時刻を維持するようにオフセット調整
+  const newVisDur = totalDur / timelineZoom;
+  timelineOffset = tAtMouse - (mouseX / drawW) * newVisDur;
+  clampTlOffset();
+  updateTlZoomLabel();
+});
+
+// ================================================
+// THREE.JS 3D PREVIEW
+// ================================================
+function initThree() {
+  const canvas = document.getElementById('preview-canvas');
+  const panel = document.getElementById('preview-panel');
+  const W = panel.clientWidth;
+  const H = panel.clientHeight - 28;
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(Math.max(W, 1), Math.max(H, 1));
+  renderer.setClearColor(0x07090f, 1);
+  renderer.shadowMap.enabled = true;
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x07090f, 0.08);
+
+  camera = new THREE.PerspectiveCamera(60, W / Math.max(H, 1), 0.1, 100);
+  camera.position.set(0, 1.6, 0);
+  camera.lookAt(0, 1.6, -5);
+
+  // Ambient
+  scene.add(new THREE.AmbientLight(0x223344, 2));
+
+  // Grid floor
+  const gridHelper = new THREE.GridHelper(20, 20, 0x1e2d45, 0x1e2d45);
+  gridHelper.position.y = 0;
+  scene.add(gridHelper);
+
+  // Tunnel walls
+  addTunnel();
+
+  markDirty();
+}
+
+function addTunnel() {
+  const mat = new THREE.MeshBasicMaterial({ color: 0x1e2d45, wireframe: true, transparent: true, opacity: 0.3 });
+  for (let z = -20; z < 0; z += 2) {
+    const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(4, 3, 0.1));
+    const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x1e2d45, transparent: true, opacity: 0.4 }));
+    line.position.set(0, 1.5, z);
+    scene.add(line);
+  }
+}
+
+// ── メッシュプール ─────────────────────────────────
+// ジオメトリ・マテリアルを一度だけ生成して毎フレーム使い回す
+const POOL_SIZE    = 64;
+const APPROACH_TIME = 2.5;
+const PREVIEW_SPEED = 8;
+const NOTE_COLORS  = [0xff3860, 0x3b82f6];
+const ROT_Z   = [Math.PI, Math.PI/2, 0, -Math.PI/2];
+const ROT_OFF = [[0,0.12],[0.12,0],[0,-0.12],[-0.12,0]];
+
+let meshPool   = [];
+let poolInited = false;
+
+function initPool() {
+  if (poolInited) return;
+  poolInited = true;
+  const bodyGeo  = new THREE.BoxGeometry(0.4, 0.4, 0.08);
+  const arrowGeo = new THREE.ConeGeometry(0.07, 0.18, 4);
+  for (let i = 0; i < POOL_SIZE; i++) {
+    const bodyMat  = new THREE.MeshPhongMaterial({ transparent: true, depthWrite: false });
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+    const body  = new THREE.Mesh(bodyGeo,  bodyMat);
+    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+    const group = new THREE.Group();
+    group.add(body);
+    group.add(arrow);
+    group.visible = false;
+    scene.add(group);
+    meshPool.push({ group, body, arrow, bodyMat, arrowMat });
+  }
+}
+
+function refreshPreview() {
+  if (!scene) return;
+  initPool();
+
+  // 全スロットを非表示リセット
+  for (let i = 0; i < meshPool.length; i++) meshPool[i].group.visible = false;
+
+  const n = gridSize;
+  const spacing = 0.6;
+  const startX = -(n - 1) * spacing / 2;
+  const startY = 0.8;
+  let pi = 0;
+
+  for (let ni = 0; ni < notes.length; ni++) {
+    if (pi >= POOL_SIZE) break;
+    const note = notes[ni];
+    const dt = note.time - currentTime;
+    if (dt < -0.3 || dt > APPROACH_TIME) continue;
+
+    const posIdx = note.spawnPos - 1;
+    const col = posIdx % n;
+    const row = Math.floor(posIdx / n);
+    const wx = startX + col * spacing;
+    const wy = startY + (n - 1 - row) * spacing;
+    const wz = -dt * PREVIEW_SPEED;
+    const opacity = Math.max(0.2, 1 - Math.abs(dt) / APPROACH_TIME);
+    const color = NOTE_COLORS[note.hand] ?? 0xffffff;
+    const rot = note.rotation ?? 0;
+
+    const slot = meshPool[pi++];
+    slot.group.visible = true;
+    slot.group.position.set(wx, wy, wz);
+    slot.bodyMat.color.setHex(color);
+    slot.bodyMat.emissive.setHex(color);
+    slot.bodyMat.emissiveIntensity = 0.25;
+    slot.bodyMat.opacity = opacity;
+    slot.arrowMat.opacity = opacity * 0.9;
+    slot.arrow.rotation.z = ROT_Z[rot];
+    slot.arrow.position.set(ROT_OFF[rot][0], ROT_OFF[rot][1], 0.06);
+  }
+}
+
+function resizePreview() {
+  if (!renderer) return;
+  const panel = document.getElementById('preview-panel');
+  const W = panel.clientWidth;
+  const H = panel.clientHeight - 28;
+  if (W < 1 || H < 1) return;
+  renderer.setSize(W, H);
+  if (camera) camera.aspect = W / H;
+  if (camera) camera.updateProjectionMatrix();
+}
+
+// ================================================
+// MAIN LOOP  (最適化済み)
+// ================================================
+let lastTimelineMs = 0;
+
+function loop() {
+  animFrameId = requestAnimationFrame(loop);
+  const now = performance.now();
+
+  // 再生時刻更新
+  if (isPlaying && audioCtx) {
+    currentTime = audioCtx.currentTime - startedAt;
+    if (duration > 0 && currentTime >= duration) {
+      currentTime = 0; pausedAt = 0; isPlaying = false;
+      document.getElementById('play-btn').textContent = '▶';
+      document.getElementById('play-btn').classList.remove('active');
+    }
+  }
+
+  // 時刻表示・シークバー (毎フレーム・軽量)
+  const t = currentTime;
+  const mm = Math.floor(t / 60);
+  const ss = (t % 60).toFixed(2).padStart(5, '0');
+  document.getElementById('time-display').textContent = `${mm}:${ss}`;
+  if (duration > 0)
+    document.getElementById('seek-fill').style.width = `${Math.min(100,(t/duration)*100)}%`;
+
+  // 波形: 再生中のみ毎フレーム、停止中は dirty 時のみ
+  if (isPlaying || gridDirty) drawWaveform();
+
+  // グリッド: 再生中は毎フレーム、停止中は dirty 時のみ
+  if (isPlaying || gridDirty) {
+    drawGrid();
+    gridDirty = false;
+  }
+
+  // タイムライン: 再生中は30fps間引き・自動スクロール、停止中は dirty 時のみ
+  if (isPlaying) {
+    const totalDur = duration || 60;
+    const visDur = totalDur / timelineZoom;
+    timelineOffset = Math.max(0, Math.min(currentTime - visDur * 0.25, totalDur - visDur));
+    if (now - lastTimelineMs > 33) { refreshTimeline(); lastTimelineMs = now; }
+  } else if (now - lastTimelineMs > 500) {
+    refreshTimeline(); lastTimelineMs = now;
+  }
+
+  // 3D
+  markDirty();
+  if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+// ================================================
+// JSON
+// ================================================
+function exportJSON() {
+  const data = {
+    bpm: parseInt(document.getElementById('bpm-input').value),
+    difficulty: document.getElementById('diff-input').value,
+    musicFile: document.getElementById('music-name').value,
+    notes: notes.map(n => ({
+      time: n.time,
+      spawnPos: n.spawnPos,
+      hand: n.hand,
+      rotation: n.rotation ?? 0
+    })).sort((a, b) => a.time - b.time)
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${data.musicFile}_${data.difficulty}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('エクスポートしました');
+}
+
+function loadJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      document.getElementById('bpm-input').value = data.bpm || 120;
+      document.getElementById('diff-input').value = data.difficulty || 'Normal';
+      document.getElementById('music-name').value = data.musicFile || '';
+      notes = (data.notes || []).map(n => ({ ...n, id: ++noteIdCounter }));
+      selectedNoteId = null;
+      document.getElementById('note-empty').style.display = 'block';
+      document.getElementById('note-edit').style.display = 'none';
+      markDirty();
+      markDirty();
+      markDirty();
+      toast(`JSON読込: ${notes.length}ノーツ`);
+    } catch (err) {
+      alert('JSONパースエラー: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ================================================
+// TOAST
+// ================================================
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// ================================================
+// INITIAL DEMO NOTES
+// ================================================
+(function demoNotes() {
+  const demo = [
+    { time: 0.5,  spawnPos: 3,  hand: 0, rotation: 0 },
+    { time: 0.5,  spawnPos: 14, hand: 1, rotation: 0 },
+    { time: 1.0,  spawnPos: 7,  hand: 0, rotation: 3 },
+    { time: 1.0,  spawnPos: 10, hand: 1, rotation: 1 },
+    { time: 1.5,  spawnPos: 6,  hand: 0, rotation: 0 },
+    { time: 1.5,  spawnPos: 11, hand: 1, rotation: 2 },
+    { time: 2.0,  spawnPos: 2,  hand: 0, rotation: 1 },
+    { time: 2.0,  spawnPos: 15, hand: 1, rotation: 3 },
+    { time: 2.5,  spawnPos: 8,  hand: 0, rotation: 0 },
+    { time: 2.5,  spawnPos: 9,  hand: 1, rotation: 0 },
+    { time: 3.0,  spawnPos: 4,  hand: 1, rotation: 2 },
+    { time: 3.5,  spawnPos: 13, hand: 0, rotation: 1 },
+  ];
+  demo.forEach(d => notes.push({ ...d, id: ++noteIdCounter }));
+})();
+
+</script>
+</body>
+</html>
